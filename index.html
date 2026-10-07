@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주차장 추천</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1c2330;--sub:#667085;--line:#e4e7ec;--accent:#2563eb;--soft:#e8f0fe}
+@media (prefers-color-scheme:dark){:root{--bg:#10141c;--card:#1a2030;--text:#e8ecf3;--sub:#9aa4b5;--line:#2a3246;--accent:#6ea0ff;--soft:#1f2a45}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Pretendard","Noto Sans KR",sans-serif;line-height:1.5}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:8px 0 14px}
+.panel,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+label:first-child{margin-top:0}
+input[type=text],input[type=number]{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;gap:8px}.row>div{flex:1}
+.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--sub)}
+button{width:100%;margin-top:12px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:600}
+.card.top{border-color:var(--accent);background:var(--soft)}
+.head{display:flex;align-items:center;gap:10px}
+.rank{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.name{font-weight:600;flex:1}.fee{font-size:18px;font-weight:700}
+.meta{display:flex;gap:14px;margin-top:8px;font-size:13px;color:var(--sub);flex-wrap:wrap}
+.meta b{color:var(--text)}
+.rule{font-size:12px;color:var(--sub);margin-top:6px}
+a{color:var(--accent);text-decoration:none;font-size:13px}
+.msg{text-align:center;color:var(--sub);padding:20px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>🅿️ 주차장 추천</h1>
+  <div class="panel">
+    <label for="q">목적지</label>
+    <input id="q" type="text" placeholder="예: 강남역, 서울시청, 롯데월드타워">
+    <div class="row">
+      <div><label for="hh">주차 시간(시간)</label><input id="hh" type="number" min="0" value="2"></div>
+      <div><label for="mm">분</label><input id="mm" type="number" min="0" max="59" step="10" value="0"></div>
+    </div>
+    <label for="w">우선순위</label>
+    <input id="w" type="range" min="0" max="100" value="50">
+    <div class="ends"><span>💰 요금 우선</span><span>🚶 거리 우선</span></div>
+    <button id="go">검색</button>
+  </div>
+  <div id="out"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const won = (n) => n === 0 ? "무료" : n.toLocaleString("ko-KR") + "원";
+
+async function search() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  const minutes = (+$("hh").value || 0) * 60 + (+$("mm").value || 0) || 60;
+  $("out").innerHTML = '<div class="msg">검색 중…</div>';
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&minutes=${minutes}&w=${$("w").value / 100}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "오류");
+    if (!data.lots.length) { $("out").innerHTML = '<div class="msg">반경 1km 안에 등록된 주차장이 없어요.</div>'; return; }
+    $("out").innerHTML =
+      `<p class="msg" style="padding:0 0 10px">📍 ${esc(data.dest.name)} 주변 ${data.count}곳 중 상위 ${data.lots.length}곳</p>` +
+      data.lots.map((l, i) => `
+      <div class="card ${i === 0 ? "top" : ""}">
+        <div class="head"><div class="rank">${i + 1}</div><div class="name">${esc(l.name)}</div><div class="fee">${won(l.fee)}</div></div>
+        <div class="meta"><span>📍 <b>${l.dist}m</b></span><span>🚶 도보 <b>${l.walk}분</b></span><span>${esc(l.kind)}</span></div>
+        <div class="rule">${esc(l.addr)}<br>기본 ${l.base}분 ${l.baseFee.toLocaleString()}원 · 추가 ${l.unit}분당 ${l.unitFee.toLocaleString()}원${l.dayFee ? " · 1일권 " + l.dayFee.toLocaleString() + "원" : ""}</div>
+        <div style="margin-top:6px"><a href="https://map.kakao.com/link/to/${encodeURIComponent(l.name)},${l.lat},${l.lng}" target="_blank" rel="noopener">길찾기 →</a></div>
+      </div>`).join("");
+  } catch (e) {
+    $("out").innerHTML = `<div class="msg">${esc(e.message)}</div>`;
+  }
+}
+$("go").addEventListener("click", search);
+$("q").addEventListener("keydown", (e) => e.key === "Enter" && search());
+</script>
+</body>
+</html>
