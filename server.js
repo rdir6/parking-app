@@ -39,7 +39,8 @@ async function loadLots() {
       type: "json",
     });
     const json = await (await fetch(url)).json();
-    const body = json.response.body;
+    const body = json.response?.body ?? json.body;
+    if (!body) throw new Error("API 응답 이상: " + JSON.stringify(json).slice(0, 500));
     const items = Array.isArray(body.items) ? body.items : body.items?.item ?? [];
     all.push(...items.map(normalize));
     if (page * rows >= Number(body.totalCount)) break;
