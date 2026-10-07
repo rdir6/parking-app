@@ -103,5 +103,5 @@ app.get("/api/search", async (req, res) => {
 
 app.get("/", (_, res) => res.sendFile(path.join(__dirname, "index.html")));
 
-await loadLots();
+await loadLots().catch((e) => console.error(e.message));
 app.listen(PORT, () => console.log(`http://localhost:${PORT}`));
